@@ -7,10 +7,11 @@ Attribute VB_GlobalNameSpace = False
 Attribute VB_Creatable = False
 Attribute VB_PredeclaredId = False
 Attribute VB_Exposed = False
+Attribute VB_Description = "Settings class for simpleKitchen project"
 Option Explicit
 
 '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-' simpleKitchen VBA v.0.1.0
+' simpleKitchen VBA v.0.2.0
 ' (c) Mykhailo Shpilienko - https://github.com/myshkarus/simplekitchen
 '----------------------------------------------------------------------------------
 ' Initial settings for simpleKitchen VBA project
@@ -30,27 +31,23 @@ Option Explicit
 '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 'list of worksheets (modules) in Russian
-Private Const modules As String = "продукты;блюда;справочники"
+Private Const SHEET_NAMES As String = "продукты;блюда;справочники"
 'list of worksheets (modules) in Ukrainian
-'Private Const modules As String = "продукти;блюда;довідники"
+'Private Const SHEET_NAMES As String = "продукти;блюда;довідники"
 'list of worksheets (modules) in English
-'Private Const modules As String = "products;dishes;references"
+'Private Const SHEET_NAMES As String = "products;dishes;references"
 
 'preinstalled values:
-Private Const config As String = "settings" 'storage Worksheet name
-Private Const configTblTitle As String = "Settings;Value" 'config table heading
-Private Const modulesTblTitle As String = "Code;Value;Ctls;Opt;DevStage" 'modules table heading
-Private Const modulesTblSubTitle As String = "[table code];[sheet name];[number of controls]" 'modules table subheading
+Private Const SHEET_SETTINGS As String = "settings" 'storage Worksheet name
+Private Const TITLE_CONFIG_TABLE As String = "Settings;Value" 'config table heading
+Private Const TITLE_SHEET_TABLES As String = "Code;Value;Ctls;Opt;DevStage" 'modules table heading
 
 'values for named ranges:
-Private Const tableID As String = "SheetID"
-Private Const db As String = "databasepath"
-Private Const rp As String = "ribbonpointer"
+Private Const SHEET_ID As String = "SheetID"
+Private Const SETTING_ITEMS As String = "databasepath;ribbonpointer"
 
-'flag to show if the settings are completed
-Private setupCompleted As Boolean
-'worksheet (storage) used to store all settings
-Private wshConfig As Worksheet
+'flag to show if the settings are Ready
+Private blnReady As Boolean
 
 'helper enumeration to format settings tables
 Private Enum Style
@@ -62,12 +59,13 @@ End Enum
 'PUBLIC PROPERTIES
 '------------------------------------
 
-Friend Property Get Completed() As Boolean
+Friend Property Get Ready() As Boolean
+Attribute Ready.VB_Description = "Get the state of the Settings class"
 '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ' Get the state of the Settings class
 ' True if the settings are set up successfully
 '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-   Completed = setupCompleted
+   Ready = blnReady
 End Property
 
 '------------------------------------
@@ -75,32 +73,34 @@ End Property
 '------------------------------------
 
 Private Function ConfigStorage() As Worksheet
+Attribute ConfigStorage.VB_Description = "Return worksheet with predefined name or create new worksheet to store settings"
 '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-' Return worksheet with predefined name or create new worksheet to store settings;
-' Depends on NewConfigStorage function
+' Return worksheet with predefined name or create new worksheet to store settings
+' Depends on ConfigStorageNew function
 ' Out: Worksheet object
 '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-   If SheetExist(config) Then
-      Set ConfigStorage = ThisWorkbook.Worksheets(config)
+   If SheetExist(SHEET_SETTINGS) Then
+      Set ConfigStorage = ThisWorkbook.Worksheets(SHEET_SETTINGS)
    Else
-      Set ConfigStorage = NewConfigStorage
+      Set ConfigStorage = ConfigStorageNew
    End If
 End Function
 
-Private Function NewConfigStorage() As Worksheet
+Private Function ConfigStorageNew() As Worksheet
+Attribute ConfigStorageNew.VB_Description = "Return new worksheet with formatted config tables"
 '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ' Return new worksheet with formatted config tables
-' Depends on CreateConfigTables() sub
+' Depends on SettingsAdd() sub
 ' Out: Worksheet object
 '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-   Dim wsh As Worksheet
+   Dim wSheet As Worksheet
    On Error GoTo 0 'to avoid gaps in execution
-   Set wsh = ThisWorkbook.Worksheets.Add
-   If Not wsh Is Nothing Then
-      wsh.name = config
-      Call CreateConfigTables(wsh)        'only if a new config storage is created
-      Set NewConfigStorage = wsh
-      Set wsh = Nothing
+   Set wSheet = ThisWorkbook.Worksheets.Add
+   If Not wSheet Is Nothing Then
+      wSheet.name = SHEET_SETTINGS
+      Call SettingsAdd(wSheet)        'only if a new config storage is created
+      Set ConfigStorageNew = wSheet
+      Set wSheet = Nothing
    End If
 End Function
 
@@ -109,17 +109,20 @@ End Function
 '------------------------------------
 
 Private Sub Class_Initialize()
+Attribute Class_Initialize.VB_Description = "Class entry point"
 '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ' Class entry point
-' Depends on function ConfigStorage and sub SetupNamedRange
+' Depends on function ConfigStorage and sub NamedRangeSetup
 '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   Dim wSheet As Worksheet
    On Error GoTo FailExit
-   Set wshConfig = ConfigStorage 'check existence or create new storage
-   If Not wshConfig Is Nothing Then
-      Call SetupNamedRange 'check named ranges or create new
+   Set wSheet = ConfigStorage 'check existence or create new storage
+   If Not wSheet Is Nothing Then
+      Call NamedRangeSetup 'check named ranges or create new
    Else: GoTo FailExit
    End If
-   setupCompleted = True
+   blnReady = True
+   Set wSheet = Nothing
    Exit Sub
 FailExit:
    MsgBox "Worksheet 'settings' with metadata is not found!" & vbCrLf & _
@@ -128,47 +131,54 @@ FailExit:
 End Sub
 
 Private Sub Class_Terminate()
+Attribute Class_Terminate.VB_Description = "Class termination"
 'uncomment after testing!
-'wshConfig.visible = xlSheetVeryHidden
-   If Not wshConfig Is Nothing Then
-      Set wshConfig = Nothing
-   End If
+'ThisWorkbook.Worksheets(SHEET_SETTINGS).visible = xlSheetVeryHidden
 End Sub
 
-Private Sub SetupNamedRange()
+Private Sub NamedRangeSetup()
+Attribute NamedRangeSetup.VB_Description = "Check existence or create new named range to store config parameters"
 '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ' Check existence or create new named range to store config parameters
 ' Depends on public sub AddNamedRange
 '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
    Dim rng As Range
    Dim valueToSearch As String
+   Dim wSheet As Worksheet
+   
+   Set wSheet = ThisWorkbook.Worksheets(SHEET_SETTINGS)
    'named range to be used in MetaData class
-   If Not RangeExists(tableID) Then
-      valueToSearch = Split(modulesTblTitle, ";")(0)
-      Set rng = wshConfig.Cells.Find(valueToSearch, wshConfig.Cells(1, 1))
-      If Not rng Is Nothing Then Call AddNamedRange(tableID, rng.AddressLocal)
+   If Not RangeExists(SHEET_ID) Then
+      valueToSearch = Split(TITLE_SHEET_TABLES, ";")(0)
+      Set rng = wSheet.Cells.Find(valueToSearch, wSheet.Cells(1, 1))
+      If Not rng Is Nothing Then Call AddNamedRange(SHEET_ID, rng.AddressLocal)
    End If
    'named range for database path string (eg: D:\Database\cookinghouse.accdb)
-   If Not RangeExists(db) Then
-      Set rng = wshConfig.Cells.Find(db, wshConfig.Cells(1, 1)).Offset(0, 1)
-      If Not rng Is Nothing Then Call AddNamedRange(db, rng.AddressLocal)
+   valueToSearch = Split(SETTING_ITEMS, ";")(0)
+   If Not RangeExists(valueToSearch) Then
+      Set rng = wSheet.Cells.Find(valueToSearch, wSheet.Cells(1, 1)).Offset(0, 1)
+      If Not rng Is Nothing Then Call AddNamedRange(valueToSearch, rng.AddressLocal)
    End If
    'named range for RibbonPointer (used to restore Ribbon)
-   If Not RangeExists(rp) Then
-      Set rng = wshConfig.Cells.Find(rp, wshConfig.Cells(1, 1)).Offset(0, 1)
-      If Not rng Is Nothing Then Call AddNamedRange(rp, rng.AddressLocal)
+   valueToSearch = Split(SETTING_ITEMS, ";")(1)
+   If Not RangeExists(valueToSearch) Then
+      Set rng = wSheet.Cells.Find(valueToSearch, wSheet.Cells(1, 1)).Offset(0, 1)
+      If Not rng Is Nothing Then Call AddNamedRange(valueToSearch, rng.AddressLocal)
    End If
    Set rng = Nothing
+   Set wSheet = Nothing
 End Sub
 
-Private Sub CreateConfigTables(ByVal wSheet As Worksheet)
+Private Sub SettingsAdd(ByVal wSheet As Worksheet)
+Attribute SettingsAdd.VB_Description = "Routine procedure to create and fill in config tables"
 '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ' Routine procedure to create and fill in config tables
 ' In: target worksheet (wshConfig cannot yet to be used)
-' Depends on FormatTable sub
+' Depends on RangeFormat sub
 '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-   Dim title() As String
-   Dim modulesItems() As String
+   Dim title As Variant
+   Dim modulesItems As Variant
+   Dim settingItems As Variant
    Dim rng As Range
    Dim i As Integer
    If Not wSheet Is Nothing Then
@@ -178,27 +188,24 @@ Private Sub CreateConfigTables(ByVal wSheet As Worksheet)
          .Font.size = 9
       End With
       
-      title = Split(configTblTitle, ";")
+      title = Split(TITLE_CONFIG_TABLE, ";")
       Set rng = wSheet.Cells(1, 1).Offset(1, 1).Resize(1, UBound(title) + 1)
       rng.value = title
-      Call FormatTable(rng, Style.title)
-      Erase title
-      Set rng = rng.Offset(1, 0).Resize(1, 1): rng.value = db
-      Set rng = rng.Offset(1, 0).Resize(1, 1): rng.value = rp
-   
-      title = Split(modulesTblTitle, ";")
-      Set rng = rng.Offset(2, 0).Resize(1, UBound(title) + 1)
-      rng.value = title
-      Call FormatTable(rng, Style.title)
+      Call RangeFormat(rng)
       Erase title
       
-      title = Split(modulesTblSubTitle, ";")
-      Set rng = rng.Offset(1, 0).Resize(1, UBound(title) + 1)
+      settingItems = Split(SETTING_ITEMS, ";")
+      Set rng = rng.Offset(1, 0).Resize(UBound(settingItems) + 1, 1)
+      rng.value = Application.WorksheetFunction.Transpose(settingItems)
+    
+      title = Split(TITLE_SHEET_TABLES, ";")
+      Set rng = rng.Offset(UBound(settingItems) + 2, 0).Resize(1, UBound(title) + 1)
       rng.value = title
-      Call FormatTable(rng, Style.subTitle)
+      Call RangeFormat(rng)
       Erase title
+      Erase settingItems
       
-      modulesItems = Split(modules, ";")
+      modulesItems = Split(SHEET_NAMES, ";")
       Set rng = rng.Offset(1, 0).Resize(1, 1)
       For i = 0 To UBound(modulesItems)
          rng.Offset(i, 0).value = i + 1: rng.Offset(i, 0).HorizontalAlignment = xlLeft
@@ -211,20 +218,15 @@ Private Sub CreateConfigTables(ByVal wSheet As Worksheet)
    If Not rng Is Nothing Then Set rng = Nothing
 End Sub
 
-Private Sub FormatTable(ByVal rng As Range, ByVal st As Style)
+Private Sub RangeFormat(ByVal rng As Range)
+Attribute RangeFormat.VB_Description = "Formatting headings of config tables"
 '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ' Formatting headings of config tables
 '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
    If Not rng Is Nothing Then
       With rng
-         Select Case st
-         Case Style.title
-            .Interior.Color = RGB(100, 100, 100)
-            .Font.Color = vbWhite
-         Case Style.subTitle
-            .Font.Color = RGB(153, 0, 0)
-            .Font.size = 8
-         End Select
+        .Interior.Color = RGB(100, 100, 100)
+        .Font.Color = vbWhite
       End With
    End If
 End Sub
