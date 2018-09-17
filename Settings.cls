@@ -49,18 +49,13 @@ Private Const SETTING_ITEMS As String = "databasepath;ribbonpointer"
 'flag to show if the settings are Ready
 Private blnReady As Boolean
 
-'helper enumeration to format settings tables
-Private Enum Style
-   title
-   subTitle
-End Enum
-
 '------------------------------------
 'PUBLIC PROPERTIES
 '------------------------------------
 
-Friend Property Get Ready() As Boolean
+Public Property Get Ready() As Boolean
 Attribute Ready.VB_Description = "Get the state of the Settings class"
+Attribute Ready.VB_UserMemId = 0
 '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ' Get the state of the Settings class
 ' True if the settings are set up successfully
