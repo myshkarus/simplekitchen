@@ -10,21 +10,20 @@ Attribute VB_Exposed = False
 Option Explicit
 
 '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-' simpleKitchen VBA v.0.2.0
+' simpleKitchen VBA v.0.1.0
 ' (c) Mykhailo Shpilienko - https://github.com/myshkarus/simplekitchen
 '----------------------------------------------------------------------------------
 ' Worksheet Start builder for simpleKitchen VBA project
 '
 ' Detailed description:
-'   Build from scratch Start worksheet with navigational buttons or kill Start
+'   Build Start worksheet from scratch with navigational buttons or kill Start
 '   page if one needs it
 '
-'TODO: hook application state to adjust Start page wallpaper and shape "about"
+' TODO: hook application state to adjust Start page wallpaper and shape "about"
 '
-' Errors:
-' Status: development and testing
+' Status: testing
 '
-' @class sheetBuilderStart
+' @class sheetBuilderStart, v.0.3.0
 ' @author myshkarus
 ' @hqinside.com
 ' @license - n/a
@@ -32,8 +31,14 @@ Option Explicit
 
 'preinstalled button's captions:
 Private Const NAV_BUTTONS As String = "планирование закупок;технологическая карта;подготовка меню;склад;отчеты;справочники"
-'Start page name in Russian
+'button's macros:
+' !!! TODO: develop macros
+Private Const NAV_MACROS As String = "xxx;aaa;bbb;ccc;ddd;Activate"
+
+'Start page name in Russian or Ukrainian
 Private Const SHEET_HOME As String = "старт"
+'Start page name in English
+'Private Const SHEET_HOME As String = "start"
 Private Const IMG_WALLPAPER As String = "wallpaper"
 
 Private Type startPage
@@ -48,25 +53,29 @@ Private this As startPage
 
 Public Function Build() As sheetBuilderStart
    '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-   ' Return starting worksheet with navigational buttons
-   ' Depends on .....
-   ' Out: Worksheet object
+   ' Build start worksheet
+   ' Depends on BuildHomePage and AdjustWallpaperSize subs
+   ' Out: SheetBuilderStart object (oneself)
    '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
    
+   On Error Resume Next                          'to avoid gaps in execution
    If this.tSheet Is Nothing Then
-      On Error GoTo 0                            'to avoid gaps in execution
       Set this.tSheet = ThisWorkbook.Worksheets.Add
       this.tSheet.name = SHEET_HOME
+      'here build the interface
       Call BuildHomePage
    End If
+   On Error GoTo 0
    
-   On Error GoTo FailStartupExit
-   Call SetActiveWindow
+   If this.tSheet Is Nothing Then
+      GoTo FailExit ' if something goes wrong
+   End If
+   'always adjust wallpaper size and place shape "about"
    Call AdjustWallpaperSize
    
-   Set Build = Self                              'do nothing if Start page exists already
+   Set Build = Self
    Exit Function
-FailStartupExit:
+FailExit:
    MsgBox "Start sheet '" & SHEET_HOME & "' is not created!" & vbCrLf & _
           "Contact the developer", vbCritical Or vbOKOnly, "System error"
    End                                           'destruct class if it fails
@@ -77,7 +86,22 @@ End Function
 '------------------------------------
 
 Public Sub Activate()
-   this.tSheet.Activate
+   '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   ' Activate start worksheet
+   '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   If Not this.tSheet Is Nothing Then
+      this.tSheet.Activate
+   End If
+End Sub
+
+Public Sub Kill()
+   '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   ' Delete start worksheet
+   '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   If Not this.tSheet Is Nothing Then
+      Application.DisplayAlerts = False
+      this.tSheet.Delete
+   End If
 End Sub
 
 '------------------------------------
@@ -93,17 +117,26 @@ End Property
 '------------------------------------
 
 Private Sub Class_Initialize()
-   If SheetExist(SHEET_HOME) Then
-      Set this.tSheet = ThisWorkbook.Worksheets(SHEET_HOME)
-   End If
+   '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   ' Class entry point
+   '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   On Error Resume Next
+   Set this.tSheet = ThisWorkbook.Worksheets(SHEET_HOME) ' try to set this.tSheet
+   On Error GoTo 0
 End Sub
 
 Private Sub Class_Terminate()
-   Call ProtectData(this.tSheet)
-   Set this.tSheet = Nothing
+   If Not this.tSheet Is Nothing Then
+      Call ProtectData(this.tSheet)              ' always protect sheet
+      Set this.tSheet = Nothing
+   End If
 End Sub
 
 Private Sub SetActiveWindow()
+   '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   ' Apply some Application and ActiveWindow properties to adjust wallpaper and
+   ' shape "about" size correctly
+   '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
    Application.DisplayFormulaBar = False
    With ActiveWindow
       .WindowState = xlMaximized
@@ -115,8 +148,12 @@ Private Sub SetActiveWindow()
 End Sub
 
 Private Sub AdjustWallpaperSize()
+   '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   ' Adjust for different monitor resolution
+   '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
    Dim wallpaper As Shape
    On Error GoTo FailExit
+   Call SetActiveWindow
    Set wallpaper = this.tSheet.Shapes(IMG_PICTURE)
    With wallpaper
       .height = Application.UsableHeight + 15
@@ -138,6 +175,8 @@ End Sub
 Private Sub BuildHomePage()
    '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
    ' Building home page from scratch
+   ' Depends on: NewButtonBuilder, NewLabelBuilder constructors, SysInfo class,
+   '             IControl interface
    '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
    Dim Button As IControl
    Dim label As IControl
@@ -147,6 +186,7 @@ Private Sub BuildHomePage()
    Dim btnBuilder As ButtonBuilder
    Dim lblBuilder As LabelBuilder
    Dim caption As Variant
+   Dim macro As Variant
    Dim imgName As String
    Dim about As String
    Dim gap As Long
@@ -188,6 +228,7 @@ Private Sub BuildHomePage()
       .Build
 
    caption = Split(NAV_BUTTONS, ";")
+   macro = Split(NAV_MACROS, ";")
    gap = cs.Middle
    Set rng = this.tSheet.Cells(1, this.tSheet.Shapes(imgName).BottomRightCell.column).Offset(2, 1)
    
@@ -238,6 +279,7 @@ Private Sub BuildHomePage()
       .Movable(False) _
       .fontSize(fs.Title) _
       .visible(True) _
+      .OnAction(macro(5)) _
       .Build
    Application.ScreenUpdating = True
    this.tSheet.Range("A2").Select
