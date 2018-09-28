@@ -1,0 +1,27 @@
+Option Explicit
+Call CopyFile(WScript.Arguments(0), WScript.Arguments(1))
+Sub CopyFile(Source, Destination)
+  Dim wasReadOnly
+  Dim fso
+  Dim fileName
+  On Error Resume Next
+  If Right(Destination, 1) <> "\" Then Destination = Destination & "\"
+  Set fso = CreateObject("Scripting.FileSystemObject")
+  wasReadOnly = False
+  If fso.FileExists(Source) = False Then Exit Sub
+  fileName = Right(Source, InStrRev(Source, "\") + 1)
+  fileName = Destination & fileName
+  'WScript.Echo fileName
+  If fso.FileExists(fileName) Then
+    If fso.GetFile(fileName).Attributes And 1 Then
+       fso.GetFile(fileName).Attributes = fso.GetFile(fileName).Attributes - 1
+       wasReadOnly = True
+    End If
+    fso.DeleteFile fileName, True
+  End if
+  fso.CopyFile Source, Destination, True
+  If wasReadOnly Then
+    fso.GetFile(fileName).Attributes = fso.GetFile(fileName).Attributes + 1
+  End if
+  Set fso = Nothing
+End Sub

@@ -1,0 +1,18 @@
+Option Explicit
+Call MoveFile(WScript.Arguments(0), WScript.Arguments(1))
+Sub MoveFile(fromSource, toDestination)
+  Dim fso
+  Dim fileName
+  On Error Resume Next
+  If Right(toDestination, 1) <> "\" Then toDestination = toDestination & "\"
+  fileName = Right(fromSource, InStrRev(fromSource, "\") + 1)
+  fileName = toDestination & fileName
+  'WScript.Echo fileName
+  Set fso = CreateObject("Scripting.FileSystemObject")
+  If fso.FileExists(fromSource) = False Then Exit Sub
+  If fso.FileExists(fileName) Then
+    fso.DeleteFile(fileName), True
+  End if
+  fso.MoveFile fromSource, toDestination
+  Set fso = Nothing
+End Sub
